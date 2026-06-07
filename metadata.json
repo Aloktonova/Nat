@@ -1,0 +1,6 @@
+{
+  "name": "Tic Tac Toe",
+  "description": "A brutalist bold typography Tic Tac Toe game with score tracking and move logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
