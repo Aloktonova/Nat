@@ -1,0 +1,202 @@
+{
+  "rules": {
+    "users": {
+      "$userId": {
+        ".read": "$userId === auth.uid || auth !== null",
+        ".write": false,
+        ".description": "User profiles: name and language can be edited by owner, stats are server-write-only",
+        "name": {
+          ".write": "$userId === auth.uid",
+          ".description": "User can update their own name"
+        },
+        "language": {
+          ".write": "$userId === auth.uid",
+          ".description": "User can update their preferred language"
+        },
+        "lastNotificationTimestamp": {
+          ".write": false,
+          ".description": "Server-tracked last notification send time to prevent duplicates"
+        },
+        "telegramUsername": {
+          ".write": "$userId === auth.uid",
+          ".description": "Player's Telegram username (e.g., @username), stored for admin notifications"
+        },
+        "lastActive": {
+          ".write": "$userId === auth.uid",
+          ".description": "User can update their last active timestamp"
+        },
+        "unlockedWallpapers": {
+          ".read": "$userId === auth.uid",
+          ".write": false,
+          ".description": "Unlocked wallpapers are server-managed only"
+        },
+        "coins": {
+          ".read": "$userId === auth.uid",
+          ".write": false,
+          ".description": "Coins are server-managed, protected from client writes"
+        },
+        "wins": {
+          ".read": true,
+          ".write": false,
+          ".description": "Win count visible publicly, server-managed only"
+        },
+        "losses": {
+          ".read": "$userId === auth.uid",
+          ".write": false,
+          ".description": "Loss count private, server-managed only"
+        },
+        "xp": {
+          ".read": "$userId === auth.uid",
+          ".write": false,
+          ".description": "XP is server-managed, protected from manipulation"
+        }
+      }
+    },
+    "rooms": {
+      ".description": "Game rooms with real-time board state and chat",
+      "$roomId": {
+        ".read": true,
+        ".write": "auth !== null",
+        ".description": "Authenticated users can join/update rooms"
+      }
+    },
+    "queue": {
+      ".description": "Battle matchmaking queue entries",
+      "$userId": {
+        ".read": true,
+        ".write": "$userId === auth.uid",
+        ".description": "Users can only add/remove themselves from queue"
+      }
+    },
+    "payments": {
+      ".read": false,
+      ".write": false,
+      ".description": "Payment records are server-only, never exposed to clients"
+    },
+    "leaderboard": {
+      ".read": true,
+      ".write": false,
+      ".description": "Main leaderboard is read-only for clients",
+      ".indexOn": ["wins", "createdAt"],
+      "$userId": {
+        ".read": true,
+        ".write": false
+      }
+    },
+    "tournaments": {
+      ".read": true,
+      ".description": "Tournament system with current tournament and history",
+      ".indexOn": ["season", "endAt"],
+      "current": {
+        ".read": true,
+        ".write": false,
+        ".description": "Current tournament metadata is read-only. Writes via transactions only for atomicity.",
+        ".indexOn": ["season"],
+        "playerCount": {
+          ".write": false,
+          ".description": "Player count is server-managed via ServerValue.increment()"
+        },
+        "players": {
+          ".read": true,
+          ".description": "Tournament player list with individual stats, only users can write to their own entry",
+          ".indexOn": ["uid", "joinedAt"],
+          "$userId": {
+            ".read": true,
+            ".write": "auth !== null && $userId === auth.uid",
+            ".validate": "$userId === auth.uid",
+            ".description": "Each user can update their own tournament stats (enforced in code via transaction pattern)",
+            "uid": { 
+              ".write": "$userId === auth.uid",
+              ".validate": "newData.val() === $userId",
+              ".description": "User can only set their own uid to match path"
+            },
+            "name": { 
+              ".write": "$userId === auth.uid",
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50",
+              ".description": "User can update name with validation"
+            },
+            "wins": { 
+              ".write": false,
+              ".description": "Tournament wins updated via server-side increment operations"
+            },
+            "losses": { 
+              ".write": false,
+              ".description": "Tournament losses updated via server-side increment operations"
+            },
+            "draws": { 
+              ".write": false,
+              ".description": "Tournament draws updated via server-side increment operations"
+            },
+            "best_streak": { 
+              ".write": false,
+              ".description": "Best streak is server-calculated only"
+            },
+            "joinedAt": { 
+              ".write": "$userId === auth.uid",
+              ".validate": "newData.isNumber() && newData.val() > 0",
+              ".description": "User sets join time once (immutable thereafter)"
+            }
+          }
+        },
+        "leaderboard": {
+          ".read": true,
+          ".description": "Tournament leaderboard is read-only for parent level. Points calculated via transactions only, indexed for fast queries",
+          ".indexOn": ["points", "wins", "updatedAt"],
+          "$userId": {
+            ".read": true,
+            ".write": "$userId === auth.uid",
+            ".validate": "$userId === newData.child('uid').val()",
+            ".description": "Authenticated users can update their own leaderboard entry to sync points from tournament stats"
+          }
+        }
+      },
+      "history": {
+        ".read": true,
+        ".write": false,
+        ".description": "Tournament history is archived and read-only",
+        ".indexOn": ["season", "archivedAt"],
+        "$historyId": {
+          ".read": true,
+          ".write": false
+        }
+      }
+    },
+    "notifications": {
+      ".description": "Telegram notification system: templates, logs, and settings",
+      "templates": {
+        ".read": true,
+        ".write": false,
+        ".description": "Notification templates are server-managed only"
+      },
+      "recent": {
+        ".read": false,
+        ".write": false,
+        ".description": "Lightweight recent send log, server-only"
+      },
+      "status": {
+        ".read": false,
+        ".write": false,
+        ".description": "Last auto-notification timestamps, server-only"
+      },
+      "logs": {
+        ".read": false,
+        ".write": false,
+        ".description": "Notification logs are server-only, never exposed to clients except through admin API",
+        ".indexOn": ["sentAt"],
+        "$date": {
+          ".read": false,
+          ".write": false,
+          "$uid": {
+            ".read": false,
+            ".write": false
+          }
+        }
+      },
+      "settings": {
+        ".read": false,
+        ".write": false,
+        ".description": "Admin notification settings, server-managed only"
+      }
+    }
+  }
+}
